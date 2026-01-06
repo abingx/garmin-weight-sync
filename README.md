@@ -32,7 +32,7 @@ garmin-weight-sync/
 
 ### 第一步：安装 Python
 1. 访问 [Python 官网](https://www.python.org/downloads/)。
-2. 下载并安装 **Python 3.12.6** 或更高版本。
+2. 下载并安装 **Python 3.12.6** **3.14会导致同步不了**。
 3. **特别注意**：安装过程中，一定要勾选 **"Add Python to PATH"**（将 Python 添加到系统变量）。
 
 ### 第二步：确认安装成功
