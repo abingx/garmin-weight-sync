@@ -38,8 +38,12 @@ config.yaml
 weight_data_*.json
 garmin-fit/
 .garth/
+garmin-fit-filter/
 
 test-users.json
+users.json
+
+filter/xiaomi2garmin.sh
 
 # Docker - sensitive config and data
 config/users.json
