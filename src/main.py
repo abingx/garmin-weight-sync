@@ -162,7 +162,8 @@ def main():
                     fitness_data = client.get_fitness_data_by_time(key="weight")
                     if fitness_data:
                         logger.info(f"Successfully fetched {len(fitness_data)} raw records using the new API")
-                        weights = unmarshal_fitness_data(fitness_data)
+                        # weights = unmarshal_fitness_data(fitness_data)
+                        weights =client.get_model_weights(model)
                         logger.info(f"Parsed and obtained {len(weights)} weight records")
                 except Exception as e:
                     logger.warning(f"Failed to fetch data with the new API: {e}")
@@ -171,7 +172,8 @@ def main():
                 # If no data from the new API, use the legacy API (for backward compatibility)
                 if not weights:
                     logger.info(f"Using legacy API, model: {model}")
-                    weights = client.get_model_weights(model)
+                    # weights = client.get_model_weights(model)
+                    weights = unmarshal_fitness_data(fitness_data)
                 if weights:
                     logger.info(f"Successfully retrieved {len(weights)} weight records")
                     display_weight_data(weights, limit=args.limit)

@@ -88,33 +88,35 @@ docker --version
 
 1. **获取项目代码**
    ```bash
-   git clone <项目地址>
+   git clone https://github.com/XiaoSiHwang/garmin-weight-sync.git
    cd garmin-weight-sync
    ```
-
-2. **创建配置文件**
+1.1 **实在不会你就手动下载这个，点击CODE那里可以下载解压**
+![alt text](doc/image.png)
+1. **创建配置文件**
    ```bash
    # Linux/Mac
-   cp config/users.json.template config/users.json
+   makdir config && makdir data **实在不会你就手动创建个两个文件夹叫config 和 data，记得是在这个路径下**
+   cp users.json config/users.json
 
-   # Windows 用户在文件管理器中复制并重命名
+   # Windows 用户在文件管理器创建 
    ```
 
    编辑 `config/users.json`，填写您的账户信息（参考下方"快速配置"章节）。
 
-3. **拉取 Docker 镜像**
+2. **拉取 Docker 镜像**
    ```bash
    docker-compose pull
    ```
 
-4. **首次登录（获取小米授权）**
+3. **首次登录（获取小米授权）**
    ```bash
    docker-compose --profile login run --rm login
    ```
 
    按照提示完成小米账号的验证码登录流程。
 
-5. **执行同步**
+4. **执行同步**
    ```bash
    docker-compose run --rm sync
    ```
@@ -122,9 +124,17 @@ docker --version
 ### 设置定时任务
 
 **Linux/Mac (crontab)**:
+![alt text](doc/image2.png)
 ```bash
+# 先找 docker-compose 的真实路径 这边最重要，要不然corn 是没法执行命令的
+which docker-compose 
+## 输出的结果替换下面定时任务的路径 以我为例我输出是 /usr/local/bin/docker-compose
+## 也有可能是/usr/bin/docker-compose
+#输出如上图
 # 每天凌晨 2 点自动同步
-0 2 * * * cd /您的项目路径 && docker-compose run --rm sync
+crontab -e ## 配置定时任务
+0 2 * * * cd /您的项目路径 && /usr/local/bin/docker-compose run --rm sync
+## 最后保存即可，记得上面的docker-compose别照抄，你们环境不一定和我一样，先获取路径再填写
 ```
 
 **Windows (任务计划程序)**:
@@ -245,11 +255,11 @@ A: 理论上支持小米运动健康里绑定的所有体脂秤。如果默认 m
 ---
 
 ## 🛡️ 安全提示
-- **users.json** 包含您的明文密码和敏感 Token，**请通过任何方式分享该文件**。
-- 建议将 `.venv/`、`.garth/` 和 `users.json` 添加到 `.gitignore` 以防意外提交到公开 GitHub。
+- **users.json** 包含您的明文密码和敏感 Token，**请勿通过任何方式分享该文件**。
+- 请勿将 `.venv/`、`.garth/` 和 `users.json` 添加到 `.gitignore` 以防意外提交到公开 GitHub。
 
 ---
 
 ## ✨ 许可证
-MIT License. 开发者：Leslie & Gemini Pair.
+MIT License. 开发者：Leslie
 参考项目：[XiaomiGateway3](https://github.com/AlexxIT/XiaomiGateway3), [garth](https://github.com/matin/garth)
