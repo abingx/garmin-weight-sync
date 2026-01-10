@@ -154,20 +154,19 @@ def unmarshal_fitness_data(data_list):
         w['UpdateTime'] = item.get("update_time")
         
         # Parse body data from value
-        w['Weight'] = parse_any_float(value_data.get("weight") or value_data.get("w"))
+        w['Weight'] = parse_any_float(value_data.get("weight"))
         w['BMI'] = parse_any_float(value_data.get("bmi"))
-        w['BodyFat'] = parse_any_float(value_data.get("body_fat_rate") or value_data.get("bfp") or value_data.get("body_fat") or value_data.get("fat"))
-        w['BodyWater'] = parse_any_float(value_data.get("moisture_rate") or value_data.get("bwp") or value_data.get("body_water") or value_data.get("water"))
-        w['BoneMass'] = parse_any_float(value_data.get("bone_mass") or value_data.get("bmc") or value_data.get("bone"))
-        w['MetabolicAge'] = parse_any_int(value_data.get("ma") or value_data.get("metabolic_age"))
-        w['MuscleMass'] = parse_any_float(value_data.get("muscle_rate") or value_data.get("slm") or value_data.get("muscle_mass") or value_data.get("muscle"))
-        w['VisceralFat'] = parse_any_int(value_data.get("visceral_fat") or value_data.get("vfl"))
-        w['BasalMetabolism'] = parse_any_int(value_data.get("basal_metabolism") or value_data.get("bmr"))
-        w['BodyScore'] = parse_any_int(value_data.get("sbc") or value_data.get("body_score"))
-        w['HeartRate'] = parse_any_int(value_data.get("heartRate") or value_data.get("heart_rate") or value_data.get("hr"))
+        w['BodyFat'] = parse_any_float(value_data.get("body_fat_rate"))
+        w['BodyWater'] = parse_any_float(value_data.get("moisture_rate"))
+        w['BoneMass'] = parse_any_float(value_data.get("bone_mass"))
+        w['MetabolicAge'] = parse_any_int(value_data.get("ma"))
+        w['MuscleMass'] = parse_any_float(value_data.get("muscle_rate")) / 100 * parse_any_float(value_data.get("weight"))
+        w['VisceralFat'] = parse_any_int(value_data.get("visceral_fat"))
+        w['BasalMetabolism'] = parse_any_int(value_data.get("basal_metabolism"))
+        w['BodyScore'] = parse_any_int(value_data.get("sbc"))
+        w['HeartRate'] = parse_any_int(value_data.get("heartRate"))
         w['ProteinRate'] = parse_any_float(value_data.get("protein_rate"))
         weights.append(w)
-    
     return weights
 
 class XiaomiClient:
