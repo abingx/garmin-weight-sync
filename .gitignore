@@ -47,3 +47,6 @@ data/*
 
 # Claude
 /.claude
+
+# release
+/release/*
