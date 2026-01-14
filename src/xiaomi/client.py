@@ -21,6 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 APP_ID = "miothealth"
 USER_AGENT = "MisFit/2.0.0 (iPhone; iOS 13.0; Scale/2.0.0)"
 
+
 def parse_any_float(v):
     if v is None:
         return 0.0
@@ -32,6 +33,7 @@ def parse_any_float(v):
         except:
             return 0.0
     return 0.0
+
 
 def parse_any_int(v):
     if v is None:
@@ -45,39 +47,41 @@ def parse_any_int(v):
             return 0
     return 0
 
+
 def unmarshal_scale_data(items):
     weights = []
     last_create_time = 0
-    
+
     for v1 in items:
         from_source = v1.get("fromSource")
         create_time = v1.get("createTime", 0)
         last_create_time = create_time
         raw_data_str = v1.get("data")
-        
+
         try:
             v2 = json.loads(raw_data_str)
         except:
             continue
-            
+
         w = {}
         # Convert ms timestamp to readable string
-        w['Date'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(create_time / 1000))
+        w['Date'] = time.strftime(
+            '%Y-%m-%d %H:%M:%S', time.localtime(create_time / 1000))
         w['Timestamp'] = create_time / 1000
         w['Source'] = from_source
-        
+
         if from_source == 1:
-            w['Weight'] = v2.get("weight")
-            w['BMI'] = v2.get("bmi")
-            w['BodyFat'] = v2.get("bfp") 
-            w['BodyWater'] = v2.get("bwp") 
-            w['BoneMass'] = v2.get("bmc")
-            w['MetabolicAge'] = v2.get("ma")
-            w['MuscleMass'] = v2.get("smm")
-            w['VisceralFat'] = v2.get("vfl")
-            w['BasalMetabolism'] = v2.get("bmr")
-            w['BodyScore'] = v2.get("sbc")
-            
+            w['Weight'] = parse_any_float(v2.get("weight"))
+            w['BMI'] = parse_any_float(v2.get("bmi"))
+            w['BodyFat'] = parse_any_float(v2.get("bfp"))
+            w['BodyWater'] = parse_any_float(v2.get("bwp"))
+            w['BoneMass'] = parse_any_float(v2.get("bmc"))
+            w['MetabolicAge'] = parse_any_int(v2.get("ma"))
+            w['MuscleMass'] = parse_any_float(v2.get("smm"))
+            w['VisceralFat'] = parse_any_int(v2.get("vfl"))
+            w['BasalMetabolism'] = parse_any_int(v2.get("bmr"))
+            w['BodyScore'] = parse_any_int(v2.get("sbc"))
+
         elif from_source == 2:
             w['Weight'] = parse_any_float(v2.get("weight"))
             w['BMI'] = parse_any_float(v2.get("bmi"))
@@ -89,12 +93,12 @@ def unmarshal_scale_data(items):
             w['VisceralFat'] = parse_any_int(v2.get("vfl"))
             w['BasalMetabolism'] = parse_any_int(v2.get("bmr"))
             w['BodyScore'] = parse_any_int(v2.get("sbc"))
-            
+
         elif from_source == 3:
             w['Weight'] = parse_any_float(v2.get("weight"))
             w['BMI'] = parse_any_float(v2.get("bmi"))
             w['HeartRate'] = v2.get("heartRate")
-            
+
             body_res_data = v2.get("bodyResData")
             if body_res_data:
                 try:
@@ -109,7 +113,7 @@ def unmarshal_scale_data(items):
                     w['BodyScore'] = parse_any_int(v3.get("sbc"))
                 except:
                     pass
-        
+
         weights.append(w)
 
     return weights, last_create_time
@@ -130,29 +134,30 @@ def unmarshal_fitness_data(data_list):
     }
     """
     weights = []
-    
+
     for item in data_list:
         if item.get("key") != "weight":
             continue
-            
+
         time_stamp = item.get("time", 0)
         value_str = item.get("value", "{}")
-        
+
         try:
             value_data = json.loads(value_str)
         except:
             _LOGGER.warning(f"Failed to parse value data: {value_str}")
             continue
-        
+
         w = {}
         # Convert timestamp (in seconds) to readable format
-        w['Date'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time_stamp))
+        w['Date'] = time.strftime(
+            '%Y-%m-%d %H:%M:%S', time.localtime(time_stamp))
         w['Timestamp'] = time_stamp
         w['Sid'] = item.get("sid")
         w['ZoneOffset'] = item.get("zone_offset")
         w['ZoneName'] = item.get("zone_name")
         w['UpdateTime'] = item.get("update_time")
-        
+
         # Parse body data from value
         w['Weight'] = parse_any_float(value_data.get("weight"))
         w['BMI'] = parse_any_float(value_data.get("bmi"))
@@ -160,14 +165,17 @@ def unmarshal_fitness_data(data_list):
         w['BodyWater'] = parse_any_float(value_data.get("moisture_rate"))
         w['BoneMass'] = parse_any_float(value_data.get("bone_mass"))
         w['MetabolicAge'] = parse_any_int(value_data.get("ma"))
-        w['MuscleMass'] = parse_any_float(value_data.get("muscle_rate")) / 100 * parse_any_float(value_data.get("weight"))
+        w['MuscleMass'] = parse_any_float(value_data.get(
+            "muscle_rate")) / 100 * parse_any_float(value_data.get("weight"))
         w['VisceralFat'] = parse_any_int(value_data.get("visceral_fat"))
-        w['BasalMetabolism'] = parse_any_int(value_data.get("basal_metabolism"))
+        w['BasalMetabolism'] = parse_any_int(
+            value_data.get("basal_metabolism"))
         w['BodyScore'] = parse_any_int(value_data.get("sbc"))
         w['HeartRate'] = parse_any_int(value_data.get("heartRate"))
         w['ProteinRate'] = parse_any_float(value_data.get("protein_rate"))
         weights.append(w)
     return weights
+
 
 class XiaomiClient:
     def __init__(self, username=None, password=None, region="cn"):
@@ -177,12 +185,12 @@ class XiaomiClient:
         self.sid = APP_ID
         self.session = requests.Session()
         # self.session.headers.update({"User-Agent": USER_AGENT})
-        
+
         # Credentials
         self.user_id = None
         self.ssecurity = None
         self.pass_token = None
-        
+
         self.cookies = {}
         self.time_offset = 0
 
@@ -214,23 +222,23 @@ class XiaomiClient:
         for i in range(256):
             j = (j + S[i] + key[i % len(key)]) % 256
             S[i], S[j] = S[j], S[i]
-        
+
         i = j = 0
         for _ in range(1024):
             i = (i + 1) % 256
             j = (j + S[i]) % 256
             S[i], S[j] = S[j], S[i]
-            
+
         out = []
         if isinstance(data, str):
             data = data.encode('utf-8')
-            
+
         for char in data:
             i = (i + 1) % 256
             j = (j + S[i]) % 256
             S[i], S[j] = S[j], S[i]
             out.append(char ^ S[(S[i] + S[j]) % 256])
-            
+
         return bytes(out)
 
     def login_from_token(self):
@@ -239,28 +247,29 @@ class XiaomiClient:
         Needs user_id, pass_token to be set.
         """
         if not self.user_id or not self.pass_token:
-             raise Exception("Missing credentials for token login")
-             
+            raise Exception("Missing credentials for token login")
+
         _LOGGER.info("Attempting login with token...")
         headers = {
             "Cookie": f"userId={self.user_id}; passToken={self.pass_token}",
             "User-Agent": USER_AGENT
         }
-        
+
         url = f"https://account.xiaomi.com/pass/serviceLogin?_json=true&sid={self.sid}"
         resp = self.session.get(url, headers=headers)
-        
+
         try:
             txt = resp.text
             if txt.startswith("&&&START&&&"):
                 txt = txt[11:]
             data = json.loads(txt)
         except Exception as e:
-            raise Exception(f"Failed to parse login response: {resp.text}") from e
-        
+            raise Exception(
+                f"Failed to parse login response: {resp.text}") from e
+
         if data.get("code") != 0:
-             raise Exception(f"Login with token failed: {data}")
-             
+            raise Exception(f"Login with token failed: {data}")
+
         # Update credentials
         if "ssecurity" in data:
             self.ssecurity = base64.b64decode(data["ssecurity"])
@@ -268,17 +277,19 @@ class XiaomiClient:
             self.user_id = data["userId"]
         if "passToken" in data:
             self.pass_token = data["passToken"]
-            
+
         auth_location = data.get("location")
         if auth_location:
             resp2 = self.session.get(auth_location)
             # Calculate time offset
             server_date = resp2.headers.get("Date")
             if server_date:
-                server_ts = email.utils.mktime_tz(email.utils.parsedate_tz(server_date))
+                server_ts = email.utils.mktime_tz(
+                    email.utils.parsedate_tz(server_date))
                 self.time_offset = server_ts - time.time()
-                _LOGGER.info(f"Synchronized time with server. Offset: {self.time_offset:.2f}s")
-        
+                _LOGGER.info(
+                    f"Synchronized time with server. Offset: {self.time_offset:.2f}s")
+
         _LOGGER.info("Login with token successful!")
         return {
             "userId": self.user_id,
@@ -288,42 +299,50 @@ class XiaomiClient:
 
     def request(self, api_url, params):
         base_url = "https://hlth.io.mi.com" if self.region == "cn" else f"https://{self.region}.hlth.io.mi.com"
-        
+
         nonce = self._gen_nonce()
         signed_nonce = self._gen_signed_nonce(self.ssecurity, nonce)
-        
-        s_hash = f"POST&{api_url}&data={params}&" + base64.b64encode(signed_nonce).decode('utf-8')
-        rc4_hash = base64.b64encode(hashlib.sha1(s_hash.encode('utf-8')).digest()).decode('utf-8')
-        
-        enc_params = base64.b64encode(self._rc4_encrypt(signed_nonce, params)).decode('utf-8')
-        enc_rc4_hash = base64.b64encode(self._rc4_encrypt(signed_nonce, rc4_hash)).decode('utf-8')
-        
-        s_sig = f"POST&{api_url}&data={enc_params}&rc4_hash__={enc_rc4_hash}&" + base64.b64encode(signed_nonce).decode('utf-8')
-        signature = base64.b64encode(hashlib.sha1(s_sig.encode('utf-8')).digest()).decode('utf-8')
-        
+
+        s_hash = f"POST&{api_url}&data={params}&" + \
+            base64.b64encode(signed_nonce).decode('utf-8')
+        rc4_hash = base64.b64encode(hashlib.sha1(
+            s_hash.encode('utf-8')).digest()).decode('utf-8')
+
+        enc_params = base64.b64encode(self._rc4_encrypt(
+            signed_nonce, params)).decode('utf-8')
+        enc_rc4_hash = base64.b64encode(self._rc4_encrypt(
+            signed_nonce, rc4_hash)).decode('utf-8')
+
+        s_sig = f"POST&{api_url}&data={enc_params}&rc4_hash__={enc_rc4_hash}&" + \
+            base64.b64encode(signed_nonce).decode('utf-8')
+        signature = base64.b64encode(hashlib.sha1(
+            s_sig.encode('utf-8')).digest()).decode('utf-8')
+
         final_data = {
             "data": enc_params,
             "rc4_hash__": enc_rc4_hash,
             "signature": signature,
             "_nonce": base64.b64encode(nonce).decode('utf-8')
         }
-        
+
         headers = {
             "Content-Type": "application/x-www-form-urlencoded"
         }
-        
+
         cookies_dict = self.session.cookies.get_dict()
         if cookies_dict:
-            cookie_str = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()])
+            cookie_str = "; ".join(
+                [f"{k}={v}" for k, v in cookies_dict.items()])
             headers["Cookie"] = cookie_str
-        
-        resp = self.session.post(base_url + api_url, data=final_data, headers=headers)
+
+        resp = self.session.post(
+            base_url + api_url, data=final_data, headers=headers)
         if curlify:
             _LOGGER.debug(curlify.to_curl(resp.request))
-        
+
         if resp.status_code != 200:
             raise Exception(f"Request failed: {resp.status_code} {resp.text}")
-            
+
         try:
             resp_bytes = base64.b64decode(resp.text)
             decrypted = self._rc4_encrypt(signed_nonce, resp_bytes)
@@ -340,24 +359,24 @@ class XiaomiClient:
         Get health data using the new API endpoint.
         API: /app/v1/data/get_fitness_data_by_time
         Supports retrieving all health data, including that imported from Zeeplife.
-        
+
         Args:
             key: Data type, e.g. "weight", "steps", "sleep", etc.
             start_time: Start timestamp (in seconds), defaults to 1 for earliest
             end_time: End timestamp (in seconds), defaults to current time + 24 hours
-        
+
         Returns:
             List of all retrieved data
         """
         if end_time is None:
             # Default end time: current time + 24 hours (in seconds)
             end_time = int(time.time()) + 24 * 60 * 60
-        
+
         _LOGGER.info(f"Fetching {key} data using new API...")
-        
+
         all_data = []
         next_key = None
-        
+
         while True:
             # Build request parameters
             params = {
@@ -365,45 +384,48 @@ class XiaomiClient:
                 "end_time": end_time,
                 "key": key
             }
-            
+
             if next_key:
                 params["next_key"] = next_key
-            
+
             req_params = json.dumps(params, separators=(',', ':'))
-            
+
             try:
                 # Call the new API endpoint
-                data = self.request("/app/v1/data/get_fitness_data_by_time", req_params)
-                
+                data = self.request(
+                    "/app/v1/data/get_fitness_data_by_time", req_params)
+
                 # Parse response - API returns: {"code": 0, "result": {"data_list": [...], "has_more": ..., "next_key": ...}}
                 if isinstance(data, dict):
                     # Check API response code
                     if data.get("code") != 0:
-                        _LOGGER.error(f"API returned error: {data.get('message', 'unknown error')}")
+                        _LOGGER.error(
+                            f"API returned error: {data.get('message', 'unknown error')}")
                         break
-                    
+
                     # Get data from result
                     result = data.get("result", {})
                     data_list = result.get("data_list", [])
                     has_more = result.get("has_more", False)
                     next_key = result.get("next_key")
-                    
+
                     all_data.extend(data_list)
-                    
+
                     # Check if there is more data
                     if not has_more or not next_key:
                         break
                 else:
                     _LOGGER.warning(f"Unexpected response type: {type(data)}")
                     break
-                    
+
             except Exception as e:
                 _LOGGER.error(f"Request failed: {e}")
                 break
-        
-        _LOGGER.info(f"Successfully fetched {len(all_data)} items of {key} data")
+
+        _LOGGER.info(
+            f"Successfully fetched {len(all_data)} items of {key} data")
         return all_data
-    
+
     def get_model_weights(self, model):
         """
         Legacy API method (kept for compatibility).
@@ -412,7 +434,7 @@ class XiaomiClient:
         _LOGGER.info(f"Fetching data for model: {model}...")
         ts = int(time.time() * 1000)
         all_weights = []
-        
+
         while ts > 0:
             inner_params = {
                 "param": {"endTime": 1, "beginTime": ts},
@@ -425,43 +447,43 @@ class XiaomiClient:
                 "params": json.dumps(inner_params, separators=(',', ':'))
             }
             req_params = json.dumps(outer_params, separators=(',', ':'))
-            
+
             try:
                 data = self.request("/app/v1/eco/api_proxy", req_params)
             except Exception as e:
                 _LOGGER.error(f"Request failed: {e}")
                 break
-                
+
             if isinstance(data, dict) and data.get("code") != 0:
                 _LOGGER.error(f"API Error: {data}")
                 break
-            
+
             res_result = data.get("result", {})
             resp_str = res_result.get("resp")
-            
+
             if not resp_str:
                 break
-                
+
             try:
                 inner_resp = json.loads(resp_str)
             except:
                 break
-                
+
             if inner_resp.get("code") != 0:
                 _LOGGER.error(f"Inner API Error: {inner_resp}")
                 break
-                
+
             items = inner_resp.get("result", [])
-            
+
             if not items:
                 break
-            
+
             weights, last_create_time = unmarshal_scale_data(items)
             all_weights.extend(weights)
-            
+
             if len(items) < 20:
                 break
-                
+
             ts = last_create_time
-            
+
         return all_weights
