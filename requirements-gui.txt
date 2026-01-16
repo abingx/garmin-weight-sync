@@ -1,0 +1,20 @@
+# GUI Framework
+PyQt6==6.6.1
+PyQt6-Qt6==6.6.1
+PyQt6-sip==13.6.0
+
+# Packaging (optional, for later)
+PyInstaller==6.3.0
+
+# Existing dependencies
+requests
+cryptography
+fit-tool
+garth
+pydantic
+pydantic-core
+requests-oauthlib
+annotated-types
+typing-extensions
+typing-inspection
+oauthlib

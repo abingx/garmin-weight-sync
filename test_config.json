@@ -1,0 +1,19 @@
+{
+    "users": [
+        {
+            "username": "test@example.com",
+            "password": "test_password",
+            "model": "yunmai.scales.ms103",
+            "token": {
+                "userId": "test_user_id",
+                "passToken": "test_token",
+                "ssecurity": "test_ssecurity"
+            },
+            "garmin": {
+                "email": "test@garmin.com",
+                "password": "test_garmin_password",
+                "domain": "CN"
+            }
+        }
+    ]
+}

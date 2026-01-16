@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 import requests
 
-import garth
+from garth.http import Client
 
 # Ensure we can import from the parent package
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -27,6 +27,8 @@ class GarminClient:
         self.password = password
         self.auth_domain = auth_domain
         self.session_dir = Path(session_dir) / email  # Segregate sessions by email
+        # Create independent Client instance to avoid conflicts with global garth singleton
+        self._client = Client()
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36",
             "origin": GARMIN_URL_DICT.get("SSO_URL_ORIGIN", "https://sso.garmin.com"),
@@ -40,9 +42,9 @@ class GarminClient:
             if self.session_dir.exists() and any(self.session_dir.iterdir()):
                 logger.info(f"Attempting to resume Garmin session for {self.email} from {self.session_dir}")
                 try:
-                    garth.resume(str(self.session_dir))
+                    self._client.load(str(self.session_dir))
                     # Check if session is still valid by accessing username
-                    username = garth.client.username
+                    username = self._client.username
                     logger.info(f"Garmin session resumed successfully for user: {username}")
                     return True
                 except Exception as e:
@@ -50,22 +52,20 @@ class GarminClient:
 
             # Perform fresh login
             logger.info(f"Logging in to Garmin for {self.email}...")
-            if self.auth_domain and self.auth_domain.upper() == "CN":
-                garth.configure(domain="garmin.cn")
-            else:
-                garth.configure(domain="garmin.com")
-            
-            garth.login(self.email, self.password, prompt_mfa=lambda: input("Enter Garmin MFA code: "))
-            
+            domain = "garmin.cn" if self.auth_domain and self.auth_domain.upper() == "CN" else "garmin.com"
+            self._client.configure(domain=domain)
+
+            self._client.login(self.email, self.password, prompt_mfa=lambda: input("Enter Garmin MFA code: "))
+
             # Save session
             self.session_dir.mkdir(parents=True, exist_ok=True)
-            garth.save(str(self.session_dir))
+            self._client.dump(str(self.session_dir))
             logger.info(f"Garmin session saved to {self.session_dir}")
-            
+
             # Clean up headers as required by some Garmin versions
-            if 'User-Agent' in garth.client.sess.headers:
-                del garth.client.sess.headers['User-Agent']
-                
+            if 'User-Agent' in self._client.sess.headers:
+                del self._client.sess.headers['User-Agent']
+
             return True
         except Exception as e:
             logger.error(f"Garmin login failed for {self.email}: {e}")
@@ -95,11 +95,11 @@ class GarminClient:
             }
 
             url_path = GARMIN_URL_DICT["garmin_connect_upload"]
-            upload_url = f"https://connectapi.{garth.client.domain}{url_path}"
-            
-            # Update headers with dynamic tokens from garth
+            upload_url = f"https://connectapi.{self._client.domain}{url_path}"
+
+            # Update headers with dynamic tokens from client
             headers = self.headers.copy()
-            headers['Authorization'] = str(garth.client.oauth2_token)
+            headers['Authorization'] = str(self._client.oauth2_token)
             
             # Using requests for the upload part as in the original code
             response = requests.post(upload_url, headers=headers, files=fields)
