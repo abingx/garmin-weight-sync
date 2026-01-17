@@ -334,8 +334,90 @@ class MainWindow(QMainWindow):
 
     def add_user(self):
         """添加用户"""
-        self.log_message("ℹ️ 添加用户功能开发中...")
-        QMessageBox.information(self, "提示", "添加用户功能将在后续版本中实现。\n目前请手动编辑 users.json 文件。")
+        # 检查配置文件是否已加载
+        if not self.config_path or not self.config_path.exists():
+            QMessageBox.warning(
+                self,
+                "未加载配置",
+                "请先加载配置文件后再添加用户。\n"
+                '点击"切换配置"按钮选择配置文件。'
+            )
+            return
+
+        # 导入并创建添加用户对话框
+        from gui.add_user_dialog import AddUserDialog
+        from core.models import UserModel, GarminConfig, TokenData
+
+        dialog = AddUserDialog(self.orchestrator.config_mgr, self)
+
+        if dialog.exec() == 1:  # Accepted
+            try:
+                # 获取用户数据
+                user_data = dialog.get_user_data()
+                if not user_data:
+                    QMessageBox.warning(self, "错误", "未能获取用户数据")
+                    return
+
+                # 构建 TokenData
+                token_data_dict = user_data.get("token", {})
+                token_data = TokenData(
+                    userId=token_data_dict.get("userId", ""),
+                    passToken=token_data_dict.get("passToken", ""),
+                    ssecurity=token_data_dict.get("ssecurity", "")
+                )
+
+                # 构建 GarminConfig
+                garmin_dict = user_data.get("garmin", {})
+                garmin_config = GarminConfig(
+                    email=garmin_dict.get("email", ""),
+                    password=garmin_dict.get("password", ""),
+                    domain=garmin_dict.get("domain", "CN"),
+                    filter=None
+                )
+
+                # 构建 UserModel
+                user = UserModel(
+                    username=user_data.get("username", ""),
+                    password=user_data.get("password", ""),
+                    model=user_data.get("model", "yunmai.scales.ms103"),
+                    token=token_data,
+                    garmin=garmin_config,
+                    created_at=None,
+                    last_sync=None
+                )
+
+                # 保存用户到配置文件
+                success = self.orchestrator.config_mgr.add_user(user)
+
+                if success:
+                    # 刷新用户列表
+                    self.load_users()
+                    QMessageBox.information(
+                        self,
+                        "添加成功",
+                        f"用户 {user.username} 已成功添加！\n\n"
+                        f"小米账号: {user.username}\n"
+                        f"设备型号: {user.model}\n"
+                        f"Garmin 账号: {user.garmin.email}"
+                    )
+                    self.log_message(f"✅ 成功添加用户: {user.username}")
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "添加失败",
+                        f"添加用户失败:\n{user.username}\n\n"
+                        "可能用户名已存在或配置文件写入失败。"
+                    )
+                    self.log_message(f"❌ 添加用户失败: {user.username}")
+
+            except Exception as e:
+                logger.exception("添加用户时发生错误")
+                QMessageBox.critical(
+                    self,
+                    "错误",
+                    f"添加用户时发生错误:\n{str(e)}"
+                )
+                self.log_message(f"❌ 添加用户错误: {str(e)}")
 
     def sync_selected_users(self):
         """同步选中的用户"""
