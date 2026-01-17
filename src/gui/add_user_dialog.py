@@ -84,6 +84,10 @@ class XiaomiPage(QWizardPage):
         self.registerField("xiaomi_password*", self.password_field)
         self.registerField("xiaomi_device", self.device_combo, "currentData")
 
+        # 连接输入验证信号,实时更新"下一步"按钮状态
+        self.username_field.textChanged.connect(self.completeChanged)
+        self.password_field.textChanged.connect(self.completeChanged)
+
     def _save_xiaomi_data(self, username: str, password: str, model: str, token_data: Dict[str, str]):
         """
         保存小米账户数据到向导
@@ -418,6 +422,10 @@ class GarminPage(QWizardPage):
         # 注册字段以供向导使用
         self.registerField("garmin_email*", self.email_field)
         self.registerField("garmin_password*", self.password_field)
+
+        # 连接输入验证信号,实时更新"下一步"按钮状态
+        self.email_field.textChanged.connect(self.completeChanged)
+        self.password_field.textChanged.connect(self.completeChanged)
 
     def validatePage(self) -> bool:
         """验证页面并保存数据"""
