@@ -5,10 +5,11 @@
 from PyQt6.QtWidgets import (
     QWizard, QWizardPage, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QComboBox, QPushButton, QRadioButton, QButtonGroup,
-    QGroupBox, QWidget
+    QGroupBox, QWidget, QMessageBox
 )
 from PyQt6.QtCore import Qt
 from typing import Optional, Dict, Any
+import base64
 
 
 class XiaomiPage(QWizardPage):
@@ -89,15 +90,242 @@ class XiaomiPage(QWizardPage):
         if not username or not password:
             return False
 
-        # TODO: 在后续任务中实现小米登录验证
-        # 暂时保存数据
-        self.wizard().xiaomi_data = {
-            "username": username,
-            "password": password,
-            "model": model
-        }
+        # 执行小米登录验证
+        from xiaomi.login import MiCloudSync
+        from gui.auth_dialogs import CaptchaDialog, MfaDialog
 
-        return True
+        try:
+            # 创建 MiCloudSync 实例
+            micloud_sync = MiCloudSync(sid="miothealth")
+
+            # 尝试登录
+            result = micloud_sync.login(username, password)
+
+            if result.get("ok"):
+                # 登录成功,提取 token 数据并保存
+                token_data = self._extract_token_data(result, micloud_sync)
+                self.wizard().xiaomi_data = {
+                    "username": username,
+                    "password": password,
+                    "model": model,
+                    "token": token_data
+                }
+                return True
+
+            # 处理验证码
+            if captcha_image := result.get("captcha"):
+                captcha_result = self._handle_captcha(captcha_image, micloud_sync)
+                if captcha_result["success"]:
+                    token_data = captcha_result["token"]
+                    self.wizard().xiaomi_data = {
+                        "username": username,
+                        "password": password,
+                        "model": model,
+                        "token": token_data
+                    }
+                    return True
+                else:
+                    # 显示错误信息并阻止继续
+                    if captcha_result.get("error"):
+                        QMessageBox.critical(
+                            self.wizard(),
+                            "登录失败",
+                            f"验证码验证失败:\n{captcha_result['error']}"
+                        )
+                    return False
+
+            # 处理 2FA
+            if verify_info := result.get("verify"):
+                mfa_result = self._handle_mfa(verify_info, micloud_sync)
+                if mfa_result["success"]:
+                    token_data = mfa_result["token"]
+                    self.wizard().xiaomi_data = {
+                        "username": username,
+                        "password": password,
+                        "model": model,
+                        "token": token_data
+                    }
+                    return True
+                else:
+                    # 显示错误信息并阻止继续
+                    if mfa_result.get("error"):
+                        QMessageBox.critical(
+                            self.wizard(),
+                            "登录失败",
+                            f"二次验证失败:\n{mfa_result['error']}"
+                        )
+                    return False
+
+            # 登录失败
+            error_msg = str(result.get("exception", "未知错误"))
+            QMessageBox.critical(
+                self.wizard(),
+                "登录失败",
+                f"小米账号登录失败:\n{error_msg}"
+            )
+            return False
+
+        except Exception as e:
+            QMessageBox.critical(
+                self.wizard(),
+                "登录错误",
+                f"登录过程发生错误:\n{str(e)}"
+            )
+            return False
+
+    def _handle_captcha(self, captcha_image: bytes, micloud_sync, retry_count: int = 0) -> Dict[str, Any]:
+        """
+        处理验证码
+
+        Args:
+            captcha_image: 验证码图片的二进制数据
+            micloud_sync: MiCloudSync 实例
+            retry_count: 当前重试次数
+
+        Returns:
+            包含 success 和 token/error 的字典
+        """
+        # 最多重试 3 次
+        if retry_count >= 3:
+            return {
+                "success": False,
+                "error": "验证码错误次数过多"
+            }
+
+        dialog = CaptchaDialog(captcha_image, self.wizard())
+
+        if dialog.exec() == 1:  # Accepted
+            code = dialog.get_code()
+
+            # 提交验证码
+            result = micloud_sync.login_captcha(code)
+
+            if result.get("ok"):
+                # 登录成功
+                token_data = self._extract_token_data(result, micloud_sync)
+                return {
+                    "success": True,
+                    "token": token_data
+                }
+            elif verify_info := result.get("verify"):
+                # 需要 2FA - 转发处理
+                return self._handle_mfa(verify_info, micloud_sync)
+            elif captcha := result.get("captcha"):
+                # 验证码错误,重新显示
+                QMessageBox.warning(
+                    self.wizard(),
+                    "验证码错误",
+                    f"验证码输入错误,请重试 ({retry_count + 1}/3)"
+                )
+                return self._handle_captcha(captcha, micloud_sync, retry_count + 1)
+            else:
+                # 其他错误
+                error_msg = str(result.get("exception", "验证码错误"))
+                return {
+                    "success": False,
+                    "error": error_msg
+                }
+        else:
+            # 用户取消
+            return {
+                "success": False,
+                "error": "用户取消"
+            }
+
+    def _handle_mfa(self, verify_info: str, micloud_sync, retry_count: int = 0) -> Dict[str, Any]:
+        """
+        处理二次验证 (2FA)
+
+        Args:
+            verify_info: 验证信息
+            micloud_sync: MiCloudSync 实例
+            retry_count: 当前重试次数
+
+        Returns:
+            包含 success 和 token/error 的字典
+        """
+        # 最多重试 3 次
+        if retry_count >= 3:
+            return {
+                "success": False,
+                "error": "验证码错误次数过多"
+            }
+
+        dialog = MfaDialog(verify_info, self.wizard())
+
+        if dialog.exec() == 1:  # Accepted
+            ticket = dialog.get_ticket()
+
+            # 提交 2FA 验证码
+            result = micloud_sync.login_verify(ticket)
+
+            if result.get("ok"):
+                # 登录成功
+                token_data = self._extract_token_data(result, micloud_sync)
+                return {
+                    "success": True,
+                    "token": token_data
+                }
+            else:
+                # 验证码错误
+                if retry_count < 2:
+                    QMessageBox.warning(
+                        self.wizard(),
+                        "验证失败",
+                        f"二次验证码错误,请重试 ({retry_count + 1}/3)"
+                    )
+                    return self._handle_mfa(verify_info, micloud_sync, retry_count + 1)
+                else:
+                    return {
+                        "success": False,
+                        "error": "二次验证码错误次数过多"
+                    }
+        else:
+            # 用户取消
+            return {
+                "success": False,
+                "error": "用户取消"
+            }
+
+    def _extract_token_data(self, result: Dict[str, Any], micloud_sync) -> Dict[str, str]:
+        """
+        从登录结果中提取 token 数据
+
+        Args:
+            result: 登录结果字典
+            micloud_sync: MiCloudSync 实例
+
+        Returns:
+            包含 userId, passToken, ssecurity 的字典
+        """
+        # MiCloudSync 返回的 token 格式是 "userId:passToken"
+        token_string = result.get("token", "")
+
+        if not token_string:
+            return {
+                "userId": "",
+                "passToken": "",
+                "ssecurity": ""
+            }
+
+        # 解析 token 字符串
+        if ":" in token_string:
+            user_id, pass_token = token_string.split(":", 1)
+        else:
+            user_id = token_string
+            pass_token = ""
+
+        # 从 micloud_sync 实例获取 ssecurity (已经是 bytes,需要 base64 编码)
+        if micloud_sync.ssecurity:
+            ssecurity = base64.b64encode(micloud_sync.ssecurity).decode('utf-8')
+        else:
+            ssecurity = ""
+
+        return {
+            "userId": user_id,
+            "passToken": pass_token,
+            "ssecurity": ssecurity
+        }
 
 
 class GarminPage(QWizardPage):
