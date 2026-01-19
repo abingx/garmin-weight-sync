@@ -40,6 +40,7 @@ garmin-fit/
 .garth/
 
 test-users.json
+users-sit.json
 
 # Docker - sensitive config and data
 config/users.json
